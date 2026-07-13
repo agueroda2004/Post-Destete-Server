@@ -1,0 +1,14 @@
+node_modules
+# Keep environment variables out of version control
+.env*
+
+/generated/prisma
+
+# Build artifacts (tsc is configured with noEmit; tsx is used at runtime,
+# but these patterns catch any stray output)
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
+dist/
+build/
