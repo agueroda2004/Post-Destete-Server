@@ -3,6 +3,7 @@ node_modules
 .env*
 
 /generated/prisma
+src/git/
 
 # Build artifacts (tsc is configured with noEmit; tsx is used at runtime,
 # but these patterns catch any stray output)

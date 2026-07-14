@@ -5,6 +5,7 @@ import express, { type Express } from "express";
 import type { Container } from "./container";
 import { errorHandler } from "./middleware/errorHandler";
 import { buildAuthRoutes } from "./routes/auth.routes";
+import { buildDeceasedRoutes } from "./routes/deceased.routes";
 import { buildDiseaseRoutes } from "./routes/disease.routes";
 
 export function buildApp(container: Container): Express {
@@ -21,6 +22,7 @@ export function buildApp(container: Container): Express {
 
   app.use("/auth", buildAuthRoutes(container.authController));
   app.use("/diseases", buildDiseaseRoutes(container.diseaseController));
+  app.use("/deceaseds", buildDeceasedRoutes(container.deceasedController));
 
   app.use(errorHandler);
 
