@@ -1,6 +1,8 @@
 import prisma from "../libs/prisma";
 
 export async function clearDatabase(): Promise<void> {
+  await prisma.deceased.deleteMany();
+  await prisma.disease.deleteMany();
   await prisma.refreshToken.deleteMany();
   await prisma.passwordResetToken.deleteMany();
   await prisma.user.deleteMany();
