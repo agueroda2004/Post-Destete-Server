@@ -41,3 +41,57 @@ model PasswordResetToken {
 
   @@index([userId])
 }
+
+model Disease {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(255)
+  active      Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  Deceaseds   Deceased[]
+
+  @@index([name])
+}
+
+enum Turn {
+  Mañana
+  Tarde
+  Noche
+}
+
+enum FoodPhase {
+  Fase1
+  Fase2
+  Fase3
+  InicioMedicado
+  InicioCorriente
+  DesarrolloMedicado
+  DesarrolloCorriente
+  Engorde
+}
+
+enum CorralType {
+  Corral
+  Hospital
+  Cuna
+}
+
+model Deceased {
+  id            Int      @id @default(autoincrement())
+  name          String   @db.VarChar(255)
+  weight        Float
+  corralNumber  String  @db.VarChar(255)
+  dateOfDeath   DateTime
+  active        Boolean  @default(true)
+  sale          Boolean @default(false)
+  diseaseId     Int
+  disease       Disease  @relation(fields: [diseaseId], references: [id], onDelete: Cascade)
+  corralType    CorralType
+  food_phase     FoodPhase
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([diseaseId])
+}

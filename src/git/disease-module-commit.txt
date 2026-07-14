@@ -1,0 +1,13 @@
+feat(disease): add CRUD module
+
+- Repository with create/update/deleteById (void) and helpers (findById, findByName, hasDeceaseds using take: 1)
+- Service validates duplicate name (409), missing disease (404), and blocked deletion when deceased records are linked (409)
+- Zod schemas for body and params, with refine ensuring at least one field on update
+- Auth-protected routes (POST, PATCH, DELETE) wired through container and app DI
+
+test(disease): add integration tests
+
+- 31 tests covering authentication (401), POST/PATCH/DELETE flows, Zod validation (400), 409 duplicates, 404 not found, 409 blocked deletion by linked deceaseds, idempotency, refine checks, and DB persistence
+- clearDatabase helper extended to clean disease and deceased tables in FK order
+- Prisma direct setup for diseases and deceaseds (no Deceased endpoint yet)
+- Authenticated agent reused via register pattern from auth tests
