@@ -1,5 +1,22 @@
 import { z } from "zod";
-import { CorralType, FoodPhase } from "../../generated/prisma/enums";
+import type { CorralType, FoodPhase } from "../../generated/prisma/enums";
+
+const CORRAL_TYPES = [
+  "Corral",
+  "Hospital",
+  "Cuna",
+] as const satisfies readonly CorralType[];
+
+const FOOD_PHASES = [
+  "Fase1",
+  "Fase2",
+  "Fase3",
+  "InicioMedicado",
+  "InicioCorriente",
+  "DesarrolloMedicado",
+  "DesarrolloCorriente",
+  "Engorde",
+] as const satisfies readonly FoodPhase[];
 
 const deceasedNameSchema = z
   .string()
@@ -35,8 +52,8 @@ export const createDeceasedBodySchema = z.object({
   active: z.boolean().optional(),
   sale: z.boolean().optional(),
   diseaseId: diseaseIdFieldSchema,
-  corralType: z.nativeEnum(CorralType),
-  food_phase: z.nativeEnum(FoodPhase),
+  corralType: z.enum(CORRAL_TYPES),
+  food_phase: z.enum(FOOD_PHASES),
 });
 
 export const createDeceasedSchema = z.object({
@@ -55,8 +72,8 @@ export const updateDeceasedBodySchema = z
     active: z.boolean().optional(),
     sale: z.boolean().optional(),
     diseaseId: diseaseIdFieldSchema.optional(),
-    corralType: z.nativeEnum(CorralType).optional(),
-    food_phase: z.nativeEnum(FoodPhase).optional(),
+    corralType: z.enum(CORRAL_TYPES).optional(),
+    food_phase: z.enum(FOOD_PHASES).optional(),
   })
   .refine(
     (data) =>
