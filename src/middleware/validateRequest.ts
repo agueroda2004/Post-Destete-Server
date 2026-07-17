@@ -24,13 +24,18 @@ export function validateRequest(schema: ZodType) {
     };
 
     if (validated.body !== undefined) {
-      request.body = validated.body;
+      request.body = validated.body as Request["body"];
     }
     if (validated.params !== undefined) {
       Object.assign(request.params, validated.params);
     }
     if (validated.query !== undefined) {
-      Object.assign(request.query, validated.query);
+      Object.defineProperty(request, "query", {
+        value: validated.query,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
     }
 
     next();

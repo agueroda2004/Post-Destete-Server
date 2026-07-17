@@ -3,9 +3,11 @@ import type { Request, Response } from "express";
 import type {
   CreateDiseaseBody,
   DeleteDiseaseParams,
+  GetDiseasesQuery,
   UpdateDiseaseBody,
   UpdateDiseaseParams,
 } from "../schemas/disease.schemas";
+import type { DiseaseListResult } from "../types/disease.types";
 import type { IDiseaseService } from "../services/disease.service";
 import { ApiResponse } from "../utils/ApiResponse";
 
@@ -13,6 +15,7 @@ export interface IDiseaseController {
   create: (request: Request, response: Response) => Promise<Response>;
   update: (request: Request, response: Response) => Promise<Response>;
   deleteById: (request: Request, response: Response) => Promise<Response>;
+  getAll: (request: Request, response: Response) => Promise<Response>;
 }
 
 export class DiseaseController implements IDiseaseController {
@@ -23,10 +26,10 @@ export class DiseaseController implements IDiseaseController {
   }
 
   create = async (
-    _request: Request,
+    request: Request,
     response: Response,
   ): Promise<Response> => {
-    const { name, active }: CreateDiseaseBody = _request.body;
+    const { name, active }: CreateDiseaseBody = request.body;
 
     await this.diseaseService.create({ name, active });
 
@@ -54,5 +57,23 @@ export class DiseaseController implements IDiseaseController {
     await this.diseaseService.deleteById(id);
 
     return ApiResponse.withoutContent(response, 204);
+  };
+
+  getAll = async (
+    request: Request,
+    response: Response,
+  ): Promise<Response> => {
+    const { name, active, page, pageSize }: GetDiseasesQuery =
+      request.query as unknown as GetDiseasesQuery;
+
+    const result: DiseaseListResult = await this.diseaseService.getAll(
+      {
+        ...(name !== undefined && { name }),
+        ...(active !== undefined && { active }),
+      },
+      { page, pageSize },
+    );
+
+    return ApiResponse.withContent(response, 200, result);
   };
 }

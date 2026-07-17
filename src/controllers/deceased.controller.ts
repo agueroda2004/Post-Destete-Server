@@ -3,16 +3,24 @@ import type { Request, Response } from "express";
 import type {
   CreateDeceasedBody,
   DeleteDeceasedParams,
+  GetDeceasedsQuery,
   UpdateDeceasedBody,
   UpdateDeceasedParams,
 } from "../schemas/deceased.schemas";
 import type { IDeceasedService } from "../services/deceased.service";
+import type { DeceasedListResult } from "../types/deceased.types";
+import type { DiseaseDropdownItem } from "../types/disease.types";
 import { ApiResponse } from "../utils/ApiResponse";
 
 export interface IDeceasedController {
   create: (request: Request, response: Response) => Promise<Response>;
   update: (request: Request, response: Response) => Promise<Response>;
   deleteById: (request: Request, response: Response) => Promise<Response>;
+  getDiseasesForDropdown: (
+    request: Request,
+    response: Response,
+  ) => Promise<Response>;
+  getAll: (request: Request, response: Response) => Promise<Response>;
 }
 
 export class DeceasedController implements IDeceasedController {
@@ -27,7 +35,7 @@ export class DeceasedController implements IDeceasedController {
     response: Response,
   ): Promise<Response> => {
     const {
-      name,
+      note,
       weight,
       corralNumber,
       dateOfDeath,
@@ -39,7 +47,7 @@ export class DeceasedController implements IDeceasedController {
     }: CreateDeceasedBody = request.body;
 
     await this.deceasedService.create({
-      name,
+      ...(note !== undefined && { note }),
       weight,
       corralNumber,
       dateOfDeath,
@@ -59,7 +67,7 @@ export class DeceasedController implements IDeceasedController {
   ): Promise<Response> => {
     const { id } = request.params as unknown as UpdateDeceasedParams;
     const {
-      name,
+      note,
       weight,
       corralNumber,
       dateOfDeath,
@@ -71,7 +79,7 @@ export class DeceasedController implements IDeceasedController {
     }: UpdateDeceasedBody = request.body;
 
     await this.deceasedService.update(id, {
-      ...(name !== undefined && { name }),
+      ...(note !== undefined && { note }),
       ...(weight !== undefined && { weight }),
       ...(corralNumber !== undefined && { corralNumber }),
       ...(dateOfDeath !== undefined && { dateOfDeath }),
@@ -94,5 +102,48 @@ export class DeceasedController implements IDeceasedController {
     await this.deceasedService.deleteById(id);
 
     return ApiResponse.withoutContent(response, 204);
+  };
+
+  getDiseasesForDropdown = async (
+    _request: Request,
+    response: Response,
+  ): Promise<Response> => {
+    const items: DiseaseDropdownItem[] =
+      await this.deceasedService.getDiseasesForDropdown();
+
+    return ApiResponse.withContent(response, 200, items);
+  };
+
+  getAll = async (
+    request: Request,
+    response: Response,
+  ): Promise<Response> => {
+    const {
+      dateFrom,
+      dateTo,
+      diseaseId,
+      foodPhase,
+      corralType,
+      corralNumber,
+      sale,
+      page,
+      pageSize,
+    }: GetDeceasedsQuery = request.query as unknown as GetDeceasedsQuery;
+
+    const result: DeceasedListResult = await this.deceasedService.getAll(
+      {
+        ...(dateFrom !== undefined && { dateFrom }),
+        ...(dateTo !== undefined && { dateTo }),
+        ...(diseaseId !== undefined && { diseaseId }),
+        ...(foodPhase !== undefined && { foodPhase }),
+        ...(corralType !== undefined && { corralType }),
+        ...(corralNumber !== undefined &&
+          corralNumber !== "" && { corralNumber }),
+        ...(sale !== undefined && { sale }),
+      },
+      { page, pageSize },
+    );
+
+    return ApiResponse.withContent(response, 200, result);
   };
 }

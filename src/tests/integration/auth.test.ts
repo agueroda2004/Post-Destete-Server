@@ -251,7 +251,7 @@ describe("Auth integration", () => {
   });
 
   describe("Cookie security", () => {
-    it("refresh cookie se emite con Path=/auth/refresh", async () => {
+    it("refresh cookie se emite con Path=/auth", async () => {
       const response = await request(app)
         .post("/auth/register")
         .send({ email: "cookie-path@example.com", password: "password123" });
@@ -262,7 +262,7 @@ describe("Auth integration", () => {
         cookie?.startsWith("refresh_token="),
       );
 
-      expect(refreshCookie).toMatch(/Path=\/auth\/refresh/);
+      expect(refreshCookie).toMatch(/Path=\/auth(;|$)/);
     });
 
     it("access cookie se emite con Path=/", async () => {

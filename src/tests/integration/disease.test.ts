@@ -30,7 +30,7 @@ async function createDiseaseInDb(name: string, active = true) {
 async function createDeceasedInDb(
   diseaseId: number,
   overrides: Partial<{
-    name: string;
+    note: string | null;
     weight: number;
     corralNumber: string;
     dateOfDeath: Date;
@@ -38,7 +38,7 @@ async function createDeceasedInDb(
 ) {
   return prisma.deceased.create({
     data: {
-      name: overrides.name ?? "cerdo-test",
+      note: overrides.note ?? null,
       weight: overrides.weight ?? 12.5,
       corralNumber: overrides.corralNumber ?? "C-001",
       dateOfDeath: overrides.dateOfDeath ?? new Date("2026-01-15T10:00:00Z"),
@@ -203,6 +203,161 @@ describe("Disease integration", () => {
         where: { name: "Neumonía" },
       });
       expect(diseaseInDb?.id).not.toBe(999);
+    });
+  });
+
+  describe("GET /diseases", () => {
+    it("rechaza sin auth con 401", async () => {
+      const response = await request(app).get("/diseases");
+
+      expect(response.status).toBe(401);
+      expect(response.body.success).toBe(false);
+    });
+
+    it("devuelve lista paginada con defaults cuando no hay query params", async () => {
+      const agent = await authenticatedAgent(app);
+      await createDiseaseInDb("Neumonía");
+      await createDiseaseInDb("Diarrea");
+      await createDiseaseInDb("Brucelosis");
+
+      const response = await agent.get("/diseases");
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.items).toHaveLength(3);
+      expect(response.body.data.total).toBe(3);
+      expect(response.body.data.page).toBe(1);
+      expect(response.body.data.pageSize).toBe(10);
+      expect(response.body.data.totalPages).toBe(1);
+      expect(response.body.data.items.map((d: { name: string }) => d.name)).toEqual([
+        "Brucelosis",
+        "Diarrea",
+        "Neumonía",
+      ]);
+    });
+
+    it("omite createdAt/updatedAt en la respuesta (no leak de auditoría)", async () => {
+      const agent = await authenticatedAgent(app);
+      await createDiseaseInDb("Neumonía");
+
+      const response = await agent.get("/diseases");
+
+      expect(response.status).toBe(200);
+      const item = response.body.data.items[0];
+      expect(item).not.toHaveProperty("createdAt");
+      expect(item).not.toHaveProperty("updatedAt");
+    });
+
+    it("respeta pageSize custom", async () => {
+      const agent = await authenticatedAgent(app);
+      await createDiseaseInDb("A");
+      await createDiseaseInDb("B");
+      await createDiseaseInDb("C");
+
+      const response = await agent.get("/diseases?pageSize=2");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(2);
+      expect(response.body.data.total).toBe(3);
+      expect(response.body.data.pageSize).toBe(2);
+      expect(response.body.data.totalPages).toBe(2);
+    });
+
+    it("respeta page custom y arranca desde el offset correcto", async () => {
+      const agent = await authenticatedAgent(app);
+      await createDiseaseInDb("A");
+      await createDiseaseInDb("B");
+      await createDiseaseInDb("C");
+      await createDiseaseInDb("D");
+
+      const response = await agent.get("/diseases?pageSize=2&page=2");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items.map((d: { name: string }) => d.name)).toEqual([
+        "C",
+        "D",
+      ]);
+      expect(response.body.data.page).toBe(2);
+    });
+
+    it("filtra por name (contains, case-insensitive por collation MariaDB)", async () => {
+      const agent = await authenticatedAgent(app);
+      await createDiseaseInDb("Neumonía severa");
+      await createDiseaseInDb("Neumonía leve");
+      await createDiseaseInDb("Diarrea");
+
+      const response = await agent.get("/diseases?name=neum");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(2);
+      expect(response.body.data.total).toBe(2);
+    });
+
+    it("filtra por active=true", async () => {
+      const agent = await authenticatedAgent(app);
+      await createDiseaseInDb("Activa1", true);
+      await createDiseaseInDb("Activa2", true);
+      await createDiseaseInDb("Inactiva1", false);
+
+      const response = await agent.get("/diseases?active=true");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(2);
+      expect(response.body.data.total).toBe(2);
+    });
+
+    it("filtra por active=false", async () => {
+      const agent = await authenticatedAgent(app);
+      await createDiseaseInDb("Activa1", true);
+      await createDiseaseInDb("Inactiva1", false);
+      await createDiseaseInDb("Inactiva2", false);
+
+      const response = await agent.get("/diseases?active=false");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(2);
+      expect(response.body.data.total).toBe(2);
+    });
+
+    it("combina filtros de name y active con paginación", async () => {
+      const agent = await authenticatedAgent(app);
+      await createDiseaseInDb("Neumonía A", true);
+      await createDiseaseInDb("Neumonía B", false);
+      await createDiseaseInDb("Neumonía C", true);
+      await createDiseaseInDb("Diarrea", true);
+
+      const response = await agent.get(
+        "/diseases?name=neum&active=true&pageSize=2&page=1",
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(2);
+      expect(response.body.data.total).toBe(2);
+    });
+
+    it("rechaza page=0 con 400 (Zod positive)", async () => {
+      const agent = await authenticatedAgent(app);
+
+      const response = await agent.get("/diseases?page=0");
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+    });
+
+    it("rechaza pageSize=101 con 400 (Zod max)", async () => {
+      const agent = await authenticatedAgent(app);
+
+      const response = await agent.get("/diseases?pageSize=101");
+
+      expect(response.status).toBe(400);
+    });
+
+    it("rechaza name vacío con 400 (Zod min 1)", async () => {
+      const agent = await authenticatedAgent(app);
+
+      const response = await agent.get("/diseases?name=");
+
+      expect(response.status).toBe(400);
     });
   });
 

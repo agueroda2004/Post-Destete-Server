@@ -4,11 +4,20 @@ import type {
   CreateDiseaseBody,
   UpdateDiseaseBody,
 } from "../schemas/disease.schemas";
+import type {
+  DiseaseListFilter,
+  DiseaseListResult,
+  DiseasePagination,
+} from "../types/disease.types";
 
 export interface IDiseaseService {
   create(input: CreateDiseaseBody): Promise<void>;
   update(id: number, input: UpdateDiseaseBody): Promise<void>;
   deleteById(id: number): Promise<void>;
+  getAll(
+    filter: DiseaseListFilter,
+    pagination: DiseasePagination,
+  ): Promise<DiseaseListResult>;
 }
 
 export class DiseaseService implements IDiseaseService {
@@ -66,5 +75,25 @@ export class DiseaseService implements IDiseaseService {
     }
 
     await this.diseaseRepository.deleteById(id);
+  }
+
+  async getAll(
+    filter: DiseaseListFilter,
+    pagination: DiseasePagination,
+  ): Promise<DiseaseListResult> {
+    const { items, total } = await this.diseaseRepository.getAll(
+      filter,
+      pagination,
+    );
+
+    const totalPages = Math.ceil(total / pagination.pageSize);
+
+    return {
+      items,
+      total,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      totalPages,
+    };
   }
 }

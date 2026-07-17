@@ -79,7 +79,7 @@ enum CorralType {
 
 model Deceased {
   id            Int      @id @default(autoincrement())
-  name          String   @db.VarChar(255)
+  note          String?   @db.VarChar(255)
   weight        Float
   corralNumber  String  @db.VarChar(255)
   dateOfDeath   DateTime

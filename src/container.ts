@@ -1,5 +1,7 @@
 import { AuthController } from "./controllers/auth.controller";
 import type { IAuthController } from "./controllers/auth.controller";
+import { DashboardController } from "./controllers/dashboard.controller";
+import type { IDashboardController } from "./controllers/dashboard.controller";
 import { DeceasedController } from "./controllers/deceased.controller";
 import type { IDeceasedController } from "./controllers/deceased.controller";
 import { DiseaseController } from "./controllers/disease.controller";
@@ -15,6 +17,7 @@ export type Container = {
   authController: IAuthController;
   diseaseController: IDiseaseController;
   deceasedController: IDeceasedController;
+  dashboardController: IDashboardController;
 };
 
 export function buildContainer(): Container {
@@ -33,5 +36,12 @@ export function buildContainer(): Container {
   );
   const deceasedController = new DeceasedController(deceasedService);
 
-  return { authController, diseaseController, deceasedController };
+  const dashboardController = new DashboardController();
+
+  return {
+    authController,
+    diseaseController,
+    deceasedController,
+    dashboardController,
+  };
 }

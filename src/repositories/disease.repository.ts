@@ -1,6 +1,10 @@
 import prisma from "../libs/prisma";
 import type {
   DiseaseCreateInput,
+  DiseaseDropdownItem,
+  DiseaseListFilter,
+  DiseaseListItem,
+  DiseasePagination,
   DiseaseRecord,
   DiseaseUpdateInput,
 } from "../types/disease.types";
@@ -12,6 +16,11 @@ export interface IDiseaseRepository {
   findById(id: number): Promise<DiseaseRecord | null>;
   findByName(name: string): Promise<DiseaseRecord | null>;
   hasDeceaseds(diseaseId: number): Promise<boolean>;
+  getAll(
+    filter: DiseaseListFilter,
+    pagination: DiseasePagination,
+  ): Promise<{ items: DiseaseListItem[]; total: number }>;
+  getActiveForDropdown(): Promise<DiseaseDropdownItem[]>;
 }
 
 export class DiseaseRepository implements IDiseaseRepository {
@@ -79,5 +88,57 @@ export class DiseaseRepository implements IDiseaseRepository {
     });
 
     return foundDeceased !== null;
+  }
+
+  async getAll(
+    filter: DiseaseListFilter,
+    pagination: DiseasePagination,
+  ): Promise<{ items: DiseaseListItem[]; total: number }> {
+    const where: {
+      name?: { contains: string };
+      active?: boolean;
+    } = {};
+
+    if (filter.name !== undefined) {
+      where.name = { contains: filter.name };
+    }
+    if (filter.active !== undefined) {
+      where.active = filter.active;
+    }
+
+    const page = Number(pagination.page) || 1;
+    const pageSize = Number(pagination.pageSize) || 10;
+    const skip = (page - 1) * pageSize;
+    const take = pageSize;
+
+    const [items, total] = await Promise.all([
+      prisma.disease.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          active: true,
+        },
+      }),
+      prisma.disease.count({ where }),
+    ]);
+
+    return { items, total };
+  }
+
+  async getActiveForDropdown(): Promise<DiseaseDropdownItem[]> {
+    const diseases = await prisma.disease.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    return diseases;
   }
 }

@@ -6,6 +6,7 @@ import { validateRequest } from "../middleware/validateRequest";
 import {
   createDeceasedSchema,
   deleteDeceasedSchema,
+  getDeceasedsSchema,
   updateDeceasedSchema,
 } from "../schemas/deceased.schemas";
 
@@ -14,6 +15,17 @@ export function buildDeceasedRoutes(
 ): Router {
   const router = Router();
 
+  router.get(
+    "/diseases",
+    authenticate,
+    deceasedController.getDiseasesForDropdown,
+  );
+  router.get(
+    "/",
+    authenticate,
+    validateRequest(getDeceasedsSchema),
+    deceasedController.getAll,
+  );
   router.post(
     "/",
     authenticate,

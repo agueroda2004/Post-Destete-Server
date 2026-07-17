@@ -8,8 +8,8 @@ import {
 const ACCESS_TOKEN_COOKIE_NAME = "access_token";
 const REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
 const ACCESS_TOKEN_COOKIE_PATH = "/";
-const REFRESH_TOKEN_COOKIE_PATH = "/auth/refresh";
-const SAME_SITE_POLICY: "lax" = "lax";
+const REFRESH_TOKEN_COOKIE_PATH = "/auth";
+const SAME_SITE_POLICY: "none" = "none";
 
 function getBaseCookieOptions() {
   return {

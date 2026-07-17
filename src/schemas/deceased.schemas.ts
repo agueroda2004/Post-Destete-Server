@@ -18,10 +18,11 @@ const FOOD_PHASES = [
   "Engorde",
 ] as const satisfies readonly FoodPhase[];
 
-const deceasedNameSchema = z
+const deceasedNoteSchema = z
   .string()
-  .min(1, "Nombre requerido")
-  .max(255, "Máximo 255 caracteres");
+  .max(255, "Máximo 255 caracteres")
+  .nullable()
+  .optional();
 
 const deceasedWeightSchema = z
   .number()
@@ -45,7 +46,7 @@ const diseaseIdFieldSchema = z.coerce
   .positive("El id de enfermedad debe ser un entero positivo");
 
 export const createDeceasedBodySchema = z.object({
-  name: deceasedNameSchema,
+  note: deceasedNoteSchema,
   weight: deceasedWeightSchema,
   corralNumber: deceasedCorralNumberSchema,
   dateOfDeath: deceasedDateOfDeathSchema,
@@ -65,7 +66,7 @@ export type CreateDeceasedBody = z.infer<typeof createDeceasedBodySchema>;
 
 export const updateDeceasedBodySchema = z
   .object({
-    name: deceasedNameSchema.optional(),
+    note: deceasedNoteSchema,
     weight: deceasedWeightSchema.optional(),
     corralNumber: deceasedCorralNumberSchema.optional(),
     dateOfDeath: deceasedDateOfDeathSchema.optional(),
@@ -77,7 +78,7 @@ export const updateDeceasedBodySchema = z
   })
   .refine(
     (data) =>
-      data.name !== undefined ||
+      data.note !== undefined ||
       data.weight !== undefined ||
       data.corralNumber !== undefined ||
       data.dateOfDeath !== undefined ||
@@ -104,3 +105,34 @@ export const deleteDeceasedSchema = z.object({
 
 export type DeleteDeceasedInput = z.infer<typeof deleteDeceasedSchema>;
 export type DeleteDeceasedParams = z.infer<typeof deceasedIdParamSchema>;
+
+export const getDeceasedsQuerySchema = z.object({
+  dateFrom: deceasedDateOfDeathSchema.optional(),
+  dateTo: deceasedDateOfDeathSchema.optional(),
+  diseaseId: z.coerce
+    .number()
+    .int()
+    .positive("El id de enfermedad debe ser un entero positivo")
+    .optional(),
+  foodPhase: z.enum(FOOD_PHASES).optional(),
+  corralType: z.enum(CORRAL_TYPES).optional(),
+  corralNumber: z
+    .string()
+    .min(1, "Número de corral requerido")
+    .max(255, "Máximo 255 caracteres")
+    .optional(),
+  sale: z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .transform((value) =>
+      typeof value === "boolean" ? value : value === "true",
+    )
+    .optional(),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+});
+
+export type GetDeceasedsQuery = z.infer<typeof getDeceasedsQuerySchema>;
+
+export const getDeceasedsSchema = z.object({
+  query: getDeceasedsQuerySchema,
+});

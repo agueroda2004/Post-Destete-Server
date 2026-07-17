@@ -40,9 +40,29 @@ export type UpdateDiseaseInput = z.infer<typeof updateDiseaseSchema>;
 export type UpdateDiseaseBody = z.infer<typeof updateDiseaseBodySchema>;
 export type UpdateDiseaseParams = z.infer<typeof diseaseIdParamSchema>;
 
+export const deleteDiseaseParamsSchema = diseaseIdParamSchema;
+
 export const deleteDiseaseSchema = z.object({
   params: diseaseIdParamSchema,
 });
 
 export type DeleteDiseaseInput = z.infer<typeof deleteDiseaseSchema>;
-export type DeleteDiseaseParams = z.infer<typeof diseaseIdParamSchema>;
+export type DeleteDiseaseParams = z.infer<typeof deleteDiseaseParamsSchema>;
+
+export const getDiseasesQuerySchema = z.object({
+  name: diseaseNameSchema.optional(),
+  active: z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .transform((value) =>
+      typeof value === "boolean" ? value : value === "true",
+    )
+    .optional(),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(10),
+});
+
+export type GetDiseasesQuery = z.infer<typeof getDiseasesQuerySchema>;
+
+export const getDiseasesSchema = z.object({
+  query: getDiseasesQuerySchema,
+});

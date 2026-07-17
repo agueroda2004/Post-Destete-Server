@@ -22,7 +22,7 @@ async function createDiseaseInDb(name: string, active = true) {
 }
 
 type DeceasedOverrides = Partial<{
-  name: string;
+  note: string | null;
   weight: number;
   corralNumber: string;
   dateOfDeath: Date;
@@ -38,7 +38,7 @@ async function createDeceasedInDb(
 ) {
   return prisma.deceased.create({
     data: {
-      name: overrides.name ?? "cerdo-test",
+      note: overrides.note ?? null,
       weight: overrides.weight ?? 12.5,
       corralNumber: overrides.corralNumber ?? "C-001",
       dateOfDeath: overrides.dateOfDeath ?? new Date("2026-01-15T10:00:00Z"),
@@ -52,7 +52,6 @@ async function createDeceasedInDb(
 }
 
 const validCreateBody = (diseaseId: number) => ({
-  name: "cerdo-test",
   weight: 12.5,
   corralNumber: "C-001",
   dateOfDeath: "2026-01-15T10:00:00Z",
@@ -96,7 +95,7 @@ describe("Deceased integration", () => {
 
       const response = await request(app)
         .patch(`/deceaseds/${deceased.id}`)
-        .send({ name: "otro" });
+        .send({ note: "otra nota" });
 
       expect(response.status).toBe(401);
     });
@@ -177,13 +176,56 @@ describe("Deceased integration", () => {
       expect(deceasedInDb?.sale).toBe(false);
     });
 
+    it("acepta note cuando se envía", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+
+      const response = await agent
+        .post("/deceaseds")
+        .send({ ...validCreateBody(disease.id), note: "Murió por diarrea" });
+
+      expect(response.status).toBe(204);
+
+      const deceasedInDb = await prisma.deceased.findFirst({
+        where: { diseaseId: disease.id },
+      });
+      expect(deceasedInDb?.note).toBe("Murió por diarrea");
+    });
+
+    it("acepta note=null explícito", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+
+      const response = await agent
+        .post("/deceaseds")
+        .send({ ...validCreateBody(disease.id), note: null });
+
+      expect(response.status).toBe(204);
+
+      const deceasedInDb = await prisma.deceased.findFirst({
+        where: { diseaseId: disease.id },
+      });
+      expect(deceasedInDb?.note).toBeNull();
+    });
+
+    it("default note=null cuando se omite", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      await agent.post("/deceaseds").send(validCreateBody(disease.id));
+
+      const deceasedInDb = await prisma.deceased.findFirst({
+        where: { diseaseId: disease.id },
+      });
+      expect(deceasedInDb?.note).toBeNull();
+    });
+
     it("persiste todos los campos en la DB", async () => {
       const agent = await authenticatedAgent(app);
       const disease = await createDiseaseInDb("Neumonía");
       const dateOfDeath = new Date("2026-02-01T08:30:00Z");
 
       await agent.post("/deceaseds").send({
-        name: "cerdo-001",
+        note: "Murió por complicaciones",
         weight: 18.7,
         corralNumber: "C-042",
         dateOfDeath: dateOfDeath.toISOString(),
@@ -195,11 +237,11 @@ describe("Deceased integration", () => {
       });
 
       const deceasedInDb = await prisma.deceased.findFirst({
-        where: { name: "cerdo-001" },
+        where: { diseaseId: disease.id },
       });
 
       expect(deceasedInDb).not.toBeNull();
-      expect(deceasedInDb?.name).toBe("cerdo-001");
+      expect(deceasedInDb?.note).toBe("Murió por complicaciones");
       expect(deceasedInDb?.weight).toBe(18.7);
       expect(deceasedInDb?.corralNumber).toBe("C-042");
       expect(deceasedInDb?.dateOfDeath.toISOString()).toBe(
@@ -214,24 +256,13 @@ describe("Deceased integration", () => {
       expect(deceasedInDb?.updatedAt).toBeInstanceOf(Date);
     });
 
-    it("rechaza nombre vacío con 400", async () => {
+    it("rechaza note mayor a 255 caracteres con 400", async () => {
       const agent = await authenticatedAgent(app);
       const disease = await createDiseaseInDb("Neumonía");
 
       const response = await agent
         .post("/deceaseds")
-        .send({ ...validCreateBody(disease.id), name: "" });
-
-      expect(response.status).toBe(400);
-    });
-
-    it("rechaza nombre mayor a 255 caracteres con 400", async () => {
-      const agent = await authenticatedAgent(app);
-      const disease = await createDiseaseInDb("Neumonía");
-
-      const response = await agent
-        .post("/deceaseds")
-        .send({ ...validCreateBody(disease.id), name: "a".repeat(256) });
+        .send({ ...validCreateBody(disease.id), note: "a".repeat(256) });
 
       expect(response.status).toBe(400);
     });
@@ -332,7 +363,7 @@ describe("Deceased integration", () => {
       expect(response.status).toBe(400);
     });
 
-    it("rechaza diseaseId \"abc\" con 400", async () => {
+    it('rechaza diseaseId "abc" con 400', async () => {
       const agent = await authenticatedAgent(app);
 
       const response = await agent
@@ -397,24 +428,43 @@ describe("Deceased integration", () => {
   });
 
   describe("PATCH /deceaseds/:id", () => {
-    it("actualiza solo el nombre con 204", async () => {
+    it("actualiza solo la nota con 204", async () => {
       const agent = await authenticatedAgent(app);
       const disease = await createDiseaseInDb("Neumonía");
       const deceased = await createDeceasedInDb(disease.id, {
-        name: "original",
+        note: "original",
       });
 
       const response = await agent
         .patch(`/deceaseds/${deceased.id}`)
-        .send({ name: "renombrado" });
+        .send({ note: "renombrado" });
 
       expect(response.status).toBe(204);
 
       const updated = await prisma.deceased.findUnique({
         where: { id: deceased.id },
       });
-      expect(updated?.name).toBe("renombrado");
+      expect(updated?.note).toBe("renombrado");
       expect(updated?.weight).toBe(12.5);
+    });
+
+    it("acepta note=null explícito en PATCH", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      const deceased = await createDeceasedInDb(disease.id, {
+        note: "algo",
+      });
+
+      const response = await agent
+        .patch(`/deceaseds/${deceased.id}`)
+        .send({ note: null });
+
+      expect(response.status).toBe(204);
+
+      const updated = await prisma.deceased.findUnique({
+        where: { id: deceased.id },
+      });
+      expect(updated?.note).toBeNull();
     });
 
     it("actualiza solo el weight con 204", async () => {
@@ -572,7 +622,7 @@ describe("Deceased integration", () => {
       const response = await agent
         .patch(`/deceaseds/${deceased.id}`)
         .send({
-          name: "renombrado",
+          note: "renombrado",
           weight: 25,
           sale: true,
           diseaseId: second.id,
@@ -583,7 +633,7 @@ describe("Deceased integration", () => {
       const updated = await prisma.deceased.findUnique({
         where: { id: deceased.id },
       });
-      expect(updated?.name).toBe("renombrado");
+      expect(updated?.note).toBe("renombrado");
       expect(updated?.weight).toBe(25);
       expect(updated?.sale).toBe(true);
       expect(updated?.diseaseId).toBe(second.id);
@@ -593,12 +643,12 @@ describe("Deceased integration", () => {
       const agent = await authenticatedAgent(app);
       const disease = await createDiseaseInDb("Neumonía");
       const deceased = await createDeceasedInDb(disease.id, {
-        name: "cerdo-test",
+        note: "nota-test",
       });
 
       const response = await agent
         .patch(`/deceaseds/${deceased.id}`)
-        .send({ name: "cerdo-test" });
+        .send({ note: "nota-test" });
 
       expect(response.status).toBe(204);
     });
@@ -606,7 +656,7 @@ describe("Deceased integration", () => {
     it("devuelve 404 cuando el muerto no existe", async () => {
       const agent = await authenticatedAgent(app);
 
-      const response = await agent.patch("/deceaseds/9999").send({ name: "x" });
+      const response = await agent.patch("/deceaseds/9999").send({ note: "x" });
 
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
@@ -642,7 +692,7 @@ describe("Deceased integration", () => {
 
       const response = await agent
         .patch("/deceaseds/abc")
-        .send({ name: "x" });
+        .send({ note: "x" });
 
       expect(response.status).toBe(400);
     });
@@ -652,7 +702,7 @@ describe("Deceased integration", () => {
 
       const response = await agent
         .patch("/deceaseds/-5")
-        .send({ name: "x" });
+        .send({ note: "x" });
 
       expect(response.status).toBe(400);
     });
@@ -660,31 +710,18 @@ describe("Deceased integration", () => {
     it("devuelve 400 cuando el id es cero", async () => {
       const agent = await authenticatedAgent(app);
 
-      const response = await agent.patch("/deceaseds/0").send({ name: "x" });
-
+      const response = await agent.patch("/deceaseds/0").send({ note: "x" });
       expect(response.status).toBe(400);
     });
 
-    it("devuelve 400 cuando name está vacío", async () => {
+    it("devuelve 400 cuando note supera 255 caracteres", async () => {
       const agent = await authenticatedAgent(app);
       const disease = await createDiseaseInDb("Neumonía");
       const deceased = await createDeceasedInDb(disease.id);
 
       const response = await agent
         .patch(`/deceaseds/${deceased.id}`)
-        .send({ name: "" });
-
-      expect(response.status).toBe(400);
-    });
-
-    it("devuelve 400 cuando name supera 255 caracteres", async () => {
-      const agent = await authenticatedAgent(app);
-      const disease = await createDiseaseInDb("Neumonía");
-      const deceased = await createDeceasedInDb(disease.id);
-
-      const response = await agent
-        .patch(`/deceaseds/${deceased.id}`)
-        .send({ name: "a".repeat(256) });
+        .send({ note: "a".repeat(256) });
 
       expect(response.status).toBe(400);
     });
@@ -784,6 +821,411 @@ describe("Deceased integration", () => {
       const response = await agent.delete("/deceaseds/-1");
 
       expect(response.status).toBe(400);
+    });
+  });
+
+  describe("GET /deceaseds", () => {
+    it("rechaza sin auth con 401", async () => {
+      const response = await request(app).get("/deceaseds");
+
+      expect(response.status).toBe(401);
+      expect(response.body.success).toBe(false);
+    });
+
+    it("devuelve lista paginada con defaults cuando no hay query params", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      await createDeceasedInDb(disease.id);
+
+      const response = await agent.get("/deceaseds");
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.items).toHaveLength(1);
+      expect(response.body.data.total).toBe(1);
+      expect(response.body.data.page).toBe(1);
+      expect(response.body.data.pageSize).toBe(20);
+      expect(response.body.data.totalPages).toBe(1);
+    });
+
+    it("devuelve lista vacía con totales en 0 cuando no hay registros", async () => {
+      const agent = await authenticatedAgent(app);
+
+      const response = await agent.get("/deceaseds");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toEqual([]);
+      expect(response.body.data.total).toBe(0);
+      expect(response.body.data.totalPages).toBe(0);
+    });
+
+    it("ordena por dateOfDeath desc y desempata por id desc", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      const oldest = await createDeceasedInDb(disease.id, {
+        dateOfDeath: new Date("2026-01-01T10:00:00Z"),
+      });
+      const middle = await createDeceasedInDb(disease.id, {
+        dateOfDeath: new Date("2026-02-01T10:00:00Z"),
+      });
+      const newest = await createDeceasedInDb(disease.id, {
+        dateOfDeath: new Date("2026-03-01T10:00:00Z"),
+      });
+
+      const response = await agent.get("/deceaseds");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items.map((d: { id: number }) => d.id)).toEqual([
+        newest.id,
+        middle.id,
+        oldest.id,
+      ]);
+    });
+
+    it("incluye la enfermedad joinada con id y name", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      const deceased = await createDeceasedInDb(disease.id);
+
+      const response = await agent.get("/deceaseds");
+
+      expect(response.status).toBe(200);
+      const item = response.body.data.items[0];
+      expect(item.disease).toEqual({ id: disease.id, name: "Neumonía" });
+      expect(deceased.diseaseId).toBe(disease.id);
+    });
+
+    it("respeta pageSize custom", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      for (let i = 0; i < 5; i++) {
+        await createDeceasedInDb(disease.id, {
+          dateOfDeath: new Date(`2026-01-0${i + 1}T10:00:00Z`),
+        });
+      }
+
+      const response = await agent.get("/deceaseds?pageSize=2");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(2);
+      expect(response.body.data.total).toBe(5);
+      expect(response.body.data.pageSize).toBe(2);
+      expect(response.body.data.totalPages).toBe(3);
+    });
+
+    it("respeta page custom y arranca desde el offset correcto", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      for (let i = 0; i < 5; i++) {
+        await createDeceasedInDb(disease.id, {
+          dateOfDeath: new Date(`2026-01-0${i + 1}T10:00:00Z`),
+        });
+      }
+
+      const response = await agent.get("/deceaseds?pageSize=2&page=2");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(2);
+      expect(response.body.data.page).toBe(2);
+    });
+
+    it("filtra por dateFrom (incluye la fecha desde)", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      await createDeceasedInDb(disease.id, {
+        dateOfDeath: new Date("2026-01-15T10:00:00Z"),
+      });
+      await createDeceasedInDb(disease.id, {
+        dateOfDeath: new Date("2026-02-15T10:00:00Z"),
+      });
+
+      const response = await agent.get("/deceaseds?dateFrom=2026-02-01");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(1);
+      expect(
+        new Date(response.body.data.items[0].dateOfDeath).getTime(),
+      ).toBeGreaterThanOrEqual(new Date("2026-02-01T00:00:00Z").getTime());
+    });
+
+    it("filtra por dateTo (incluye todo el día de la fecha hasta)", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      await createDeceasedInDb(disease.id, {
+        dateOfDeath: new Date("2026-01-15T23:30:00Z"),
+      });
+      await createDeceasedInDb(disease.id, {
+        dateOfDeath: new Date("2026-02-15T10:00:00Z"),
+      });
+
+      const response = await agent.get("/deceaseds?dateTo=2026-01-31");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(1);
+      expect(
+        new Date(response.body.data.items[0].dateOfDeath).getTime(),
+      ).toBeLessThanOrEqual(new Date("2026-01-31T23:59:59Z").getTime());
+    });
+
+    it("filtra combinando dateFrom y dateTo", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      await createDeceasedInDb(disease.id, {
+        dateOfDeath: new Date("2026-01-15T10:00:00Z"),
+      });
+      await createDeceasedInDb(disease.id, {
+        dateOfDeath: new Date("2026-02-15T10:00:00Z"),
+      });
+      await createDeceasedInDb(disease.id, {
+        dateOfDeath: new Date("2026-03-15T10:00:00Z"),
+      });
+
+      const response = await agent.get(
+        "/deceaseds?dateFrom=2026-02-01&dateTo=2026-02-28",
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(1);
+    });
+
+    it("filtra por diseaseId", async () => {
+      const agent = await authenticatedAgent(app);
+      const first = await createDiseaseInDb("Neumonía");
+      const second = await createDiseaseInDb("Diarrea");
+      await createDeceasedInDb(first.id);
+      await createDeceasedInDb(first.id);
+      await createDeceasedInDb(second.id);
+
+      const response = await agent.get(`/deceaseds?diseaseId=${first.id}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(2);
+      expect(
+        response.body.data.items.every(
+          (d: { diseaseId: number }) => d.diseaseId === undefined,
+        ),
+      ).toBe(true);
+      expect(
+        response.body.data.items.every(
+          (d: { disease: { id: number } }) => d.disease.id === first.id,
+        ),
+      ).toBe(true);
+    });
+
+    it("filtra por food_phase", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      await createDeceasedInDb(disease.id, { food_phase: "Fase1" });
+      await createDeceasedInDb(disease.id, { food_phase: "Fase1" });
+      await createDeceasedInDb(disease.id, { food_phase: "Engorde" });
+
+      const response = await agent.get("/deceaseds?foodPhase=Fase1");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(2);
+      expect(
+        response.body.data.items.every(
+          (d: { food_phase: string }) => d.food_phase === "Fase1",
+        ),
+      ).toBe(true);
+    });
+
+    it("filtra por corralType", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      await createDeceasedInDb(disease.id, { corralType: "Corral" });
+      await createDeceasedInDb(disease.id, { corralType: "Hospital" });
+      await createDeceasedInDb(disease.id, { corralType: "Cuna" });
+
+      const response = await agent.get("/deceaseds?corralType=Hospital");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(1);
+      expect(response.body.data.items[0].corralType).toBe("Hospital");
+    });
+
+    it("filtra por corralNumber (contains)", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      await createDeceasedInDb(disease.id, { corralNumber: "C-001" });
+      await createDeceasedInDb(disease.id, { corralNumber: "C-042" });
+      await createDeceasedInDb(disease.id, { corralNumber: "H-100" });
+
+      const response = await agent.get("/deceaseds?corralNumber=C-0");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(2);
+    });
+
+    it("filtra por sale=true", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      await createDeceasedInDb(disease.id, { sale: true });
+      await createDeceasedInDb(disease.id, { sale: false });
+
+      const response = await agent.get("/deceaseds?sale=true");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(1);
+      expect(response.body.data.items[0].sale).toBe(true);
+    });
+
+    it("filtra por sale=false", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      await createDeceasedInDb(disease.id, { sale: true });
+      await createDeceasedInDb(disease.id, { sale: false });
+
+      const response = await agent.get("/deceaseds?sale=false");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(1);
+      expect(response.body.data.items[0].sale).toBe(false);
+    });
+
+    it("combina múltiples filtros con paginación", async () => {
+      const agent = await authenticatedAgent(app);
+      const first = await createDiseaseInDb("Neumonía");
+      const second = await createDiseaseInDb("Diarrea");
+      for (let i = 0; i < 5; i++) {
+        await createDeceasedInDb(first.id, {
+          dateOfDeath: new Date(`2026-02-0${i + 1}T10:00:00Z`),
+          food_phase: "Fase1",
+          corralType: "Corral",
+        });
+      }
+      await createDeceasedInDb(second.id, {
+        dateOfDeath: new Date("2026-02-10T10:00:00Z"),
+        food_phase: "Engorde",
+      });
+
+      const response = await agent.get(
+        `/deceaseds?diseaseId=${first.id}&foodPhase=Fase1&corralType=Corral&pageSize=2&page=1`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(2);
+      expect(response.body.data.total).toBe(5);
+      expect(response.body.data.totalPages).toBe(3);
+    });
+
+    it("rechaza page=0 con 400", async () => {
+      const agent = await authenticatedAgent(app);
+
+      const response = await agent.get("/deceaseds?page=0");
+
+      expect(response.status).toBe(400);
+    });
+
+    it("rechaza pageSize=101 con 400", async () => {
+      const agent = await authenticatedAgent(app);
+
+      const response = await agent.get("/deceaseds?pageSize=101");
+
+      expect(response.status).toBe(400);
+    });
+
+    it("rechaza diseaseId no entero con 400", async () => {
+      const agent = await authenticatedAgent(app);
+
+      const response = await agent.get("/deceaseds?diseaseId=1.5");
+
+      expect(response.status).toBe(400);
+    });
+
+    it("rechaza foodPhase inválido con 400", async () => {
+      const agent = await authenticatedAgent(app);
+
+      const response = await agent.get("/deceaseds?foodPhase=Destete");
+
+      expect(response.status).toBe(400);
+    });
+
+    it("rechaza corralType inválido con 400", async () => {
+      const agent = await authenticatedAgent(app);
+
+      const response = await agent.get("/deceaseds?corralType=Hangar");
+
+      expect(response.status).toBe(400);
+    });
+
+    it("rechaza dateFrom inválido con 400", async () => {
+      const agent = await authenticatedAgent(app);
+
+      const response = await agent.get("/deceaseds?dateFrom=no-es-fecha");
+
+      expect(response.status).toBe(400);
+    });
+
+    it("rechaza corralNumber vacío con 400", async () => {
+      const agent = await authenticatedAgent(app);
+
+      const response = await agent.get("/deceaseds?corralNumber=");
+
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe("GET /deceaseds/diseases", () => {
+    it("rechaza sin auth con 401", async () => {
+      const response = await request(app).get("/deceaseds/diseases");
+
+      expect(response.status).toBe(401);
+      expect(response.body.success).toBe(false);
+    });
+
+    it("devuelve array vacío cuando no hay enfermedades", async () => {
+      const agent = await authenticatedAgent(app);
+
+      const response = await agent.get("/deceaseds/diseases");
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toEqual([]);
+    });
+
+    it("devuelve solo las enfermedades activas", async () => {
+      const agent = await authenticatedAgent(app);
+      await createDiseaseInDb("Neumonía", true);
+      await createDiseaseInDb("Diarrea", true);
+      await createDiseaseInDb("Brucelosis", false);
+
+      const response = await agent.get("/deceaseds/diseases");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toHaveLength(2);
+      expect(
+        response.body.data.map((d: { name: string }) => d.name),
+      ).toEqual(["Diarrea", "Neumonía"]);
+    });
+
+    it("ordena los resultados alfabéticamente por nombre", async () => {
+      const agent = await authenticatedAgent(app);
+      await createDiseaseInDb("Neumonía", true);
+      await createDiseaseInDb("Absceso", true);
+      await createDiseaseInDb("Diarrea", true);
+
+      const response = await agent.get("/deceaseds/diseases");
+
+      expect(response.status).toBe(200);
+      expect(
+        response.body.data.map((d: { name: string }) => d.name),
+      ).toEqual(["Absceso", "Diarrea", "Neumonía"]);
+    });
+
+    it("solo expone id y name (omite active, createdAt, updatedAt)", async () => {
+      const agent = await authenticatedAgent(app);
+      await createDiseaseInDb("Neumonía", true);
+
+      const response = await agent.get("/deceaseds/diseases");
+
+      expect(response.status).toBe(200);
+      const item = response.body.data[0];
+      expect(item).toHaveProperty("id");
+      expect(item).toHaveProperty("name");
+      expect(item).not.toHaveProperty("active");
+      expect(item).not.toHaveProperty("createdAt");
+      expect(item).not.toHaveProperty("updatedAt");
     });
   });
 });

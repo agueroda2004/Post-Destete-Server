@@ -6,12 +6,19 @@ import { validateRequest } from "../middleware/validateRequest";
 import {
   createDiseaseSchema,
   deleteDiseaseSchema,
+  getDiseasesSchema,
   updateDiseaseSchema,
 } from "../schemas/disease.schemas";
 
 export function buildDiseaseRoutes(diseaseController: IDiseaseController): Router {
   const router = Router();
 
+  router.get(
+    "/",
+    authenticate,
+    validateRequest(getDiseasesSchema),
+    diseaseController.getAll,
+  );
   router.post(
     "/",
     authenticate,

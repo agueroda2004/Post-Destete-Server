@@ -5,11 +5,22 @@ import type {
   CreateDeceasedBody,
   UpdateDeceasedBody,
 } from "../schemas/deceased.schemas";
+import type { DiseaseDropdownItem } from "../types/disease.types";
+import type {
+  DeceasedListFilter,
+  DeceasedListResult,
+  DeceasedPagination,
+} from "../types/deceased.types";
 
 export interface IDeceasedService {
   create(input: CreateDeceasedBody): Promise<void>;
   update(id: number, input: UpdateDeceasedBody): Promise<void>;
   deleteById(id: number): Promise<void>;
+  getDiseasesForDropdown(): Promise<DiseaseDropdownItem[]>;
+  getAll(
+    filter: DeceasedListFilter,
+    pagination: DeceasedPagination,
+  ): Promise<DeceasedListResult>;
 }
 
 export class DeceasedService implements IDeceasedService {
@@ -31,7 +42,7 @@ export class DeceasedService implements IDeceasedService {
     }
 
     await this.deceasedRepository.create({
-      name: input.name,
+      ...(input.note !== undefined && { note: input.note }),
       weight: input.weight,
       corralNumber: input.corralNumber,
       dateOfDeath: input.dateOfDeath,
@@ -59,7 +70,7 @@ export class DeceasedService implements IDeceasedService {
     }
 
     await this.deceasedRepository.update(id, {
-      ...(input.name !== undefined && { name: input.name }),
+      ...(input.note !== undefined && { note: input.note }),
       ...(input.weight !== undefined && { weight: input.weight }),
       ...(input.corralNumber !== undefined && {
         corralNumber: input.corralNumber,
@@ -82,5 +93,29 @@ export class DeceasedService implements IDeceasedService {
     }
 
     await this.deceasedRepository.deleteById(id);
+  }
+
+  async getDiseasesForDropdown(): Promise<DiseaseDropdownItem[]> {
+    return this.diseaseRepository.getActiveForDropdown();
+  }
+
+  async getAll(
+    filter: DeceasedListFilter,
+    pagination: DeceasedPagination,
+  ): Promise<DeceasedListResult> {
+    const { items, total } = await this.deceasedRepository.getAll(
+      filter,
+      pagination,
+    );
+
+    const totalPages = Math.ceil(total / pagination.pageSize);
+
+    return {
+      items,
+      total,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      totalPages,
+    };
   }
 }
