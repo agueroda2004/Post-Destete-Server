@@ -1,4 +1,4 @@
-import type { CorralType, FoodPhase } from "../../generated/prisma/enums";
+import type { CorralType, FoodPhase, Turn } from "../../generated/prisma/enums";
 
 export type DeceasedRecord = {
   id: number;
@@ -11,6 +11,7 @@ export type DeceasedRecord = {
   diseaseId: number;
   corralType: CorralType;
   food_phase: FoodPhase;
+  turn: Turn;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -25,6 +26,7 @@ export type DeceasedCreateInput = {
   diseaseId: number;
   corralType: CorralType;
   food_phase: FoodPhase;
+  turn: Turn;
 };
 
 export type DeceasedUpdateInput = {
@@ -37,6 +39,7 @@ export type DeceasedUpdateInput = {
   diseaseId?: number;
   corralType?: CorralType;
   food_phase?: FoodPhase;
+  turn?: Turn;
 };
 
 export type DeceasedListFilter = {
@@ -47,6 +50,7 @@ export type DeceasedListFilter = {
   corralType?: CorralType;
   corralNumber?: string;
   sale?: boolean;
+  turn?: Turn;
 };
 
 export type DeceasedPagination = {
@@ -64,6 +68,7 @@ export type DeceasedListItem = {
   sale: boolean;
   corralType: CorralType;
   food_phase: FoodPhase;
+  turn: Turn;
   disease: {
     id: number;
     name: string;

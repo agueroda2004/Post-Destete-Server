@@ -7,7 +7,7 @@ import { buildContainer } from "../../container";
 import prisma from "../../libs/prisma";
 import { clearDatabase, disconnectDatabase } from "../helpers";
 import { clearRateLimits } from "../../middleware/rateLimit";
-import type { CorralType, FoodPhase } from "../../../generated/prisma/enums";
+import type { CorralType, FoodPhase, Turn } from "../../../generated/prisma/enums";
 
 async function authenticatedAgent(app: Express, email = "user@example.com") {
   const agent = request.agent(app);
@@ -30,6 +30,7 @@ type DeceasedOverrides = Partial<{
   sale: boolean;
   corralType: CorralType;
   food_phase: FoodPhase;
+  turn: Turn;
 }>;
 
 async function createDeceasedInDb(
@@ -47,6 +48,7 @@ async function createDeceasedInDb(
       diseaseId,
       corralType: overrides.corralType ?? "Corral",
       food_phase: overrides.food_phase ?? "InicioCorriente",
+      turn: overrides.turn ?? "Mañana",
     },
   });
 }

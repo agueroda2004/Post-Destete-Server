@@ -80,6 +80,15 @@ const FOOD_PHASES = [
 ] as const;
 type FoodPhase = (typeof FOOD_PHASES)[number];
 
+const TURNS = ["Mañana", "Tarde", "Noche"] as const;
+type Turn = (typeof TURNS)[number];
+
+const TURN_WEIGHTS: Record<Turn, number> = {
+  Mañana: 35,
+  Tarde: 45,
+  Noche: 20,
+};
+
 const CORRAL_TYPE_WEIGHTS: Record<CorralType, number> = {
   Corral: 60,
   Hospital: 25,
@@ -286,12 +295,14 @@ async function main() {
     diseaseId: number;
     corralType: CorralType;
     food_phase: FoodPhase;
+    turn: Turn;
   }> = [];
 
   for (const dateOfDeath of dates) {
     const diseaseId = pickWeightedFromList(rng, distributionItems);
     const foodPhase = pickWeighted(rng, FOOD_PHASE_WEIGHTS);
     const corralType = pickWeighted(rng, CORRAL_TYPE_WEIGHTS);
+    const turn = pickWeighted(rng, TURN_WEIGHTS);
 
     const sale = rng() < 0.3;
     const active = rng() < 0.92;
@@ -307,6 +318,7 @@ async function main() {
       diseaseId,
       corralType,
       food_phase: foodPhase,
+      turn,
     });
   }
 
@@ -323,6 +335,13 @@ async function main() {
     sold: records.filter((r) => r.sale).length,
     activeRecords: records.filter((r) => r.active).length,
     withNote: records.filter((r) => r.note !== null).length,
+    byTurn: TURNS.reduce<Record<Turn, number>>(
+      (acc, t) => {
+        acc[t] = records.filter((r) => r.turn === t).length;
+        return acc;
+      },
+      { Mañana: 0, Tarde: 0, Noche: 0 },
+    ),
   };
 
   console.log("Seed completado:");

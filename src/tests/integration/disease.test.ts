@@ -45,6 +45,7 @@ async function createDeceasedInDb(
       diseaseId,
       corralType: "Corral",
       food_phase: "InicioCorriente",
+      turn: "Mañana",
     },
   });
 }

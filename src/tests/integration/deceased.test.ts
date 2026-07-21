@@ -7,7 +7,7 @@ import { buildContainer } from "../../container";
 import prisma from "../../libs/prisma";
 import { clearDatabase, disconnectDatabase } from "../helpers";
 import { clearRateLimits } from "../../middleware/rateLimit";
-import type { CorralType, FoodPhase } from "../../../generated/prisma/enums";
+import type { CorralType, FoodPhase, Turn } from "../../../generated/prisma/enums";
 
 async function authenticatedAgent(app: Express, email = "user@example.com") {
   const agent = request.agent(app);
@@ -30,6 +30,7 @@ type DeceasedOverrides = Partial<{
   sale: boolean;
   corralType: CorralType;
   food_phase: FoodPhase;
+  turn: Turn;
 }>;
 
 async function createDeceasedInDb(
@@ -47,6 +48,7 @@ async function createDeceasedInDb(
       diseaseId,
       corralType: overrides.corralType ?? "Corral",
       food_phase: overrides.food_phase ?? "InicioCorriente",
+      turn: overrides.turn ?? "Mañana",
     },
   });
 }
@@ -58,6 +60,7 @@ const validCreateBody = (diseaseId: number) => ({
   diseaseId,
   corralType: "Corral" as const,
   food_phase: "InicioCorriente" as const,
+  turn: "Mañana" as const,
 });
 
 describe("Deceased integration", () => {
@@ -234,6 +237,7 @@ describe("Deceased integration", () => {
         diseaseId: disease.id,
         corralType: "Hospital",
         food_phase: "Engorde",
+        turn: "Tarde",
       });
 
       const deceasedInDb = await prisma.deceased.findFirst({
@@ -252,8 +256,46 @@ describe("Deceased integration", () => {
       expect(deceasedInDb?.diseaseId).toBe(disease.id);
       expect(deceasedInDb?.corralType).toBe("Hospital");
       expect(deceasedInDb?.food_phase).toBe("Engorde");
+      expect(deceasedInDb?.turn).toBe("Tarde");
       expect(deceasedInDb?.createdAt).toBeInstanceOf(Date);
       expect(deceasedInDb?.updatedAt).toBeInstanceOf(Date);
+    });
+
+    it("rechaza turn faltante con 400", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      const { turn: _ignored, ...bodyWithoutTurn } = validCreateBody(disease.id);
+
+      const response = await agent.post("/deceaseds").send(bodyWithoutTurn);
+
+      expect(response.status).toBe(400);
+    });
+
+    it("rechaza turn inválido con 400", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+
+      const response = await agent
+        .post("/deceaseds")
+        .send({ ...validCreateBody(disease.id), turn: "Madrugada" });
+
+      expect(response.status).toBe(400);
+    });
+
+    it("persiste turn cuando se envía un valor válido", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+
+      const response = await agent
+        .post("/deceaseds")
+        .send({ ...validCreateBody(disease.id), turn: "Noche" });
+
+      expect(response.status).toBe(204);
+
+      const deceasedInDb = await prisma.deceased.findFirst({
+        where: { diseaseId: disease.id },
+      });
+      expect(deceasedInDb?.turn).toBe("Noche");
     });
 
     it("rechaza note mayor a 255 caracteres con 400", async () => {
@@ -611,6 +653,37 @@ describe("Deceased integration", () => {
         where: { id: deceased.id },
       });
       expect(updated?.food_phase).toBe("Engorde");
+    });
+
+    it("actualiza solo turn con 204", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      const deceased = await createDeceasedInDb(disease.id, {
+        turn: "Mañana",
+      });
+
+      const response = await agent
+        .patch(`/deceaseds/${deceased.id}`)
+        .send({ turn: "Noche" });
+
+      expect(response.status).toBe(204);
+
+      const updated = await prisma.deceased.findUnique({
+        where: { id: deceased.id },
+      });
+      expect(updated?.turn).toBe("Noche");
+    });
+
+    it("rechaza turn inválido en PATCH con 400", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      const deceased = await createDeceasedInDb(disease.id);
+
+      const response = await agent
+        .patch(`/deceaseds/${deceased.id}`)
+        .send({ turn: "Madrugada" });
+
+      expect(response.status).toBe(400);
     });
 
     it("actualiza múltiples campos a la vez con 204", async () => {
@@ -1081,6 +1154,44 @@ describe("Deceased integration", () => {
       expect(response.status).toBe(200);
       expect(response.body.data.items).toHaveLength(1);
       expect(response.body.data.items[0].sale).toBe(false);
+    });
+
+    it("filtra por turn", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      await createDeceasedInDb(disease.id, { turn: "Mañana" });
+      await createDeceasedInDb(disease.id, { turn: "Mañana" });
+      await createDeceasedInDb(disease.id, { turn: "Tarde" });
+      await createDeceasedInDb(disease.id, { turn: "Noche" });
+
+      const response = await agent.get("/deceaseds?turn=Mañana");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items).toHaveLength(2);
+      expect(
+        response.body.data.items.every(
+          (d: { turn: string }) => d.turn === "Mañana",
+        ),
+      ).toBe(true);
+    });
+
+    it("exponer el campo turn en la respuesta del listado", async () => {
+      const agent = await authenticatedAgent(app);
+      const disease = await createDiseaseInDb("Neumonía");
+      await createDeceasedInDb(disease.id, { turn: "Tarde" });
+
+      const response = await agent.get("/deceaseds");
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.items[0].turn).toBe("Tarde");
+    });
+
+    it("rechaza turn inválido en query con 400", async () => {
+      const agent = await authenticatedAgent(app);
+
+      const response = await agent.get("/deceaseds?turn=Madrugada");
+
+      expect(response.status).toBe(400);
     });
 
     it("combina múltiples filtros con paginación", async () => {

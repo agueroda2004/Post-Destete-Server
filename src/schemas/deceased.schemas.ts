@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { CorralType, FoodPhase } from "../../generated/prisma/enums";
+import type { CorralType, FoodPhase, Turn } from "../../generated/prisma/enums";
 
 const CORRAL_TYPES = [
   "Corral",
@@ -17,6 +17,8 @@ const FOOD_PHASES = [
   "DesarrolloCorriente",
   "Engorde",
 ] as const satisfies readonly FoodPhase[];
+
+const TURNS = ["Mañana", "Tarde", "Noche"] as const satisfies readonly Turn[];
 
 const deceasedNoteSchema = z
   .string()
@@ -55,6 +57,7 @@ export const createDeceasedBodySchema = z.object({
   diseaseId: diseaseIdFieldSchema,
   corralType: z.enum(CORRAL_TYPES),
   food_phase: z.enum(FOOD_PHASES),
+  turn: z.enum(TURNS),
 });
 
 export const createDeceasedSchema = z.object({
@@ -75,6 +78,7 @@ export const updateDeceasedBodySchema = z
     diseaseId: diseaseIdFieldSchema.optional(),
     corralType: z.enum(CORRAL_TYPES).optional(),
     food_phase: z.enum(FOOD_PHASES).optional(),
+    turn: z.enum(TURNS).optional(),
   })
   .refine(
     (data) =>
@@ -86,7 +90,8 @@ export const updateDeceasedBodySchema = z
       data.sale !== undefined ||
       data.diseaseId !== undefined ||
       data.corralType !== undefined ||
-      data.food_phase !== undefined,
+      data.food_phase !== undefined ||
+      data.turn !== undefined,
     { message: "Debes enviar al menos un campo a actualizar" },
   );
 
@@ -127,6 +132,7 @@ export const getDeceasedsQuerySchema = z.object({
       typeof value === "boolean" ? value : value === "true",
     )
     .optional(),
+  turn: z.enum(TURNS).optional(),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });

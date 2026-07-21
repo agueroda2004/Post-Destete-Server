@@ -1,21 +1,22 @@
 import type { Response } from "express";
 
-import {
-  ACCESS_TOKEN_MAX_AGE_MS,
-  REFRESH_TOKEN_MAX_AGE_MS,
-} from "./jwt";
+import { ACCESS_TOKEN_MAX_AGE_MS, REFRESH_TOKEN_MAX_AGE_MS } from "./jwt";
 
 const ACCESS_TOKEN_COOKIE_NAME = "access_token";
 const REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
 const ACCESS_TOKEN_COOKIE_PATH = "/";
 const REFRESH_TOKEN_COOKIE_PATH = "/auth";
-const SAME_SITE_POLICY: "none" = "none";
+
+function isSecureCookie(): boolean {
+  return process.env.COOKIE_SECURE === "true";
+}
 
 function getBaseCookieOptions() {
+  const secure = isSecureCookie();
   return {
     httpOnly: true,
-    secure: process.env.COOKIE_SECURE === "true",
-    sameSite: SAME_SITE_POLICY,
+    secure,
+    sameSite: secure ? ("none" as const) : ("lax" as const),
   };
 }
 

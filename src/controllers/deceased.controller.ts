@@ -44,6 +44,7 @@ export class DeceasedController implements IDeceasedController {
       diseaseId,
       corralType,
       food_phase,
+      turn,
     }: CreateDeceasedBody = request.body;
 
     await this.deceasedService.create({
@@ -56,6 +57,7 @@ export class DeceasedController implements IDeceasedController {
       diseaseId,
       corralType,
       food_phase,
+      turn,
     });
 
     return ApiResponse.withoutContent(response, 204);
@@ -76,6 +78,7 @@ export class DeceasedController implements IDeceasedController {
       diseaseId,
       corralType,
       food_phase,
+      turn,
     }: UpdateDeceasedBody = request.body;
 
     await this.deceasedService.update(id, {
@@ -88,6 +91,7 @@ export class DeceasedController implements IDeceasedController {
       ...(diseaseId !== undefined && { diseaseId }),
       ...(corralType !== undefined && { corralType }),
       ...(food_phase !== undefined && { food_phase }),
+      ...(turn !== undefined && { turn }),
     });
 
     return ApiResponse.withoutContent(response, 204);
@@ -126,6 +130,7 @@ export class DeceasedController implements IDeceasedController {
       corralType,
       corralNumber,
       sale,
+      turn,
       page,
       pageSize,
     }: GetDeceasedsQuery = request.query as unknown as GetDeceasedsQuery;
@@ -140,6 +145,7 @@ export class DeceasedController implements IDeceasedController {
         ...(corralNumber !== undefined &&
           corralNumber !== "" && { corralNumber }),
         ...(sale !== undefined && { sale }),
+        ...(turn !== undefined && { turn }),
       },
       { page, pageSize },
     );

@@ -33,6 +33,7 @@ export class DeceasedRepository implements IDeceasedRepository {
         diseaseId: input.diseaseId,
         corralType: input.corralType,
         food_phase: input.food_phase,
+        turn: input.turn,
       },
     });
   }
@@ -48,6 +49,7 @@ export class DeceasedRepository implements IDeceasedRepository {
     if (input.diseaseId !== undefined) data.diseaseId = input.diseaseId;
     if (input.corralType !== undefined) data.corralType = input.corralType;
     if (input.food_phase !== undefined) data.food_phase = input.food_phase;
+    if (input.turn !== undefined) data.turn = input.turn;
 
     await prisma.deceased.update({
       where: { id },
@@ -75,6 +77,7 @@ export class DeceasedRepository implements IDeceasedRepository {
         diseaseId: true,
         corralType: true,
         food_phase: true,
+        turn: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -115,6 +118,9 @@ export class DeceasedRepository implements IDeceasedRepository {
     if (filter.sale !== undefined) {
       where.sale = filter.sale;
     }
+    if (filter.turn !== undefined) {
+      where.turn = filter.turn;
+    }
 
     const page = Number(pagination.page) || 1;
     const pageSize = Number(pagination.pageSize) || 20;
@@ -137,6 +143,7 @@ export class DeceasedRepository implements IDeceasedRepository {
           sale: true,
           corralType: true,
           food_phase: true,
+          turn: true,
           disease: {
             select: {
               id: true,

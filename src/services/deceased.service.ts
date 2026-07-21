@@ -51,6 +51,7 @@ export class DeceasedService implements IDeceasedService {
       diseaseId: input.diseaseId,
       corralType: input.corralType,
       food_phase: input.food_phase,
+      turn: input.turn,
     });
   }
 
@@ -83,6 +84,7 @@ export class DeceasedService implements IDeceasedService {
       ...(input.diseaseId !== undefined && { diseaseId: input.diseaseId }),
       ...(input.corralType !== undefined && { corralType: input.corralType }),
       ...(input.food_phase !== undefined && { food_phase: input.food_phase }),
+      ...(input.turn !== undefined && { turn: input.turn }),
     });
   }
 
